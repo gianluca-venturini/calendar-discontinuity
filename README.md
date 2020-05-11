@@ -1,0 +1,1 @@
+Given a calendar calculates discontinuity for d3fc following instructions at https://github.com/d3fc/d3fc/tree/master/packages/d3fc-discontinuous-scale.
