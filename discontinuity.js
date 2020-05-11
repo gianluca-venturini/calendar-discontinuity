@@ -3,6 +3,9 @@ require('moment-timezone');
 
 const NY_TIMEZONE = 'America/New_York';
 
+const msInHour = 1000 * 60 * 60;
+const msInDay = msInHour * 24;
+
 function toDateOpen(calendarDay) {
     return moment.tz(`${calendarDay.date} ${calendarDay.open}`, 'YYYY-MM-DD HH:mm', NY_TIMEZONE);
 }
@@ -36,7 +39,7 @@ function discontinuitySkipMarketClose (calendar) {
             const open = toDateOpen(calendarDay);
             if (open.diff(d) > 0) {
                 // date before open
-                d = d.subtract(1, 'day');
+                d.subtract(1, 'day');
             }
             if (d.diff(close) > 0) {
                 // date after close
@@ -44,7 +47,7 @@ function discontinuitySkipMarketClose (calendar) {
             }
         }
         while (!calendar[d.format('YYYY-MM-DD')]) {
-            d = d.subtract(1, 'day');
+            d.subtract(1, 'day');
         }
         calendarDay = calendar[d.format('YYYY-MM-DD')];
         return toDateClose(calendarDay).toDate();
@@ -55,7 +58,7 @@ function discontinuitySkipMarketClose (calendar) {
             return date;
         }
         let d = moment(date);
-        let calendarDay = calendar[d.format('YYYY-MM-DD')]
+        let calendarDay = calendar[d.format('YYYY-MM-DD')];
         if (!!calendarDay) {
             const close = toDateClose(calendarDay);
             const open = toDateOpen(calendarDay);
@@ -65,11 +68,11 @@ function discontinuitySkipMarketClose (calendar) {
             }
             if (d.diff(close) > 0) {
                 // date after close
-                d = d.add(1, 'day');
+                d.add(1, 'day');
             }
         }
         while (!calendar[d.format('YYYY-MM-DD')]) {
-            d = d.add(1, 'day');
+            d.add(1, 'day');
         }
         calendarDay = calendar[d.format('YYYY-MM-DD')];
         return toDateOpen(calendarDay).toDate();
@@ -81,40 +84,38 @@ function discontinuitySkipMarketClose (calendar) {
         startDate = moment(discontinuity.clampUp(startDate));
         endDate = moment(discontinuity.clampDown(endDate));
 
+        if (endDate.diff(startDate) < 0) {
+            return 0;
+        }
+
         let distanceMs = 0;
-        let d = startDate.add('day', 1);
-        while (d.diff(endDate.subtract('day', 1)) < 0) {
-            const calendarDay = calendar[d.format('YYYY-MM-DD')];
-            if (!!calendarDay) {
-                distanceMs += toDateClose(calendarDay).diff(toDateOpen(calendarDay));
-            }
-            d = d.add('day', 1);
+        let d = startDate;
+        while (endDate.diff(d) > msInDay) {
+            let calendarDay = calendar[d.format('YYYY-MM-DD')];
+            const close = toDateClose(calendarDay);
+            distanceMs += close.diff(d);
+            // Go to next trading day
+            d = moment(discontinuity.clampUp(close.add(1, 'second').toDate()));
         }
-        const startCalendarDay = calendar[startDate.format('YYYY-MM-DD')];
-        const endCalendarDay = calendar[endDate.format('YYYY-MM-DD')];
-        if (startCalendarDay) {
-            distanceMs += toDateClose(startCalendarDay).diff(startDate);
-        }
-        if (endCalendarDay) {
-            distanceMs += endDate.diff(toDateOpen(endCalendarDay));
-        }
+        distanceMs += endDate.diff(d);
 
         return distanceMs;
     };
 
     discontinuity.offset = function (startDate, ms) {
-        const d = moment(isMarketOpen(startDate) ? discontinuity.clampUp(startDate) : startDate);
-        
+        let d = moment(!isMarketOpen(startDate) ? discontinuity.clampUp(startDate) : startDate);
         while (ms > 0) {
             const calendarDay = calendar[d.format('YYYY-MM-DD')];
             if (!!calendarDay) {
-                close = toDateClose(calendarDay);
-                const newDate = d.add('millisecond', ms);
-                if (close.diff(newDate) > 0) {
+                const close = toDateClose(calendarDay);
+                const newDate = d.clone();
+                newDate.add(ms, 'millisecond');
+                if (close.diff(newDate) >= 0) {
                     return newDate.toDate();
                 }
                 ms -= close.diff(d);
-                d = discontinuity.clampUp(close.add('minute', 1));
+                // Go to next trading day
+                d = moment(discontinuity.clampUp(close.add(1, 'second').toDate()));
             }
         }
     };
@@ -125,3 +126,4 @@ function discontinuitySkipMarketClose (calendar) {
 };
 
 module.exports = discontinuitySkipMarketClose;
+ 
