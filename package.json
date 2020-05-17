@@ -10,7 +10,5 @@
   "license": "ISC",
   "dependencies": {
     "jest": "^26.0.1",
-    "moment": "^2.25.3",
-    "moment-timezone": "^0.5.28"
   }
 }

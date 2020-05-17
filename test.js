@@ -1,4 +1,4 @@
-const discontinuitySkipMarketClose = require('./discontinuity');
+const {discontinuitySkipMarketClose, formatDate} = require('./discontinuity');
 
 const calendar={
     '2020-01-06': {
@@ -58,6 +58,12 @@ const msInHour = msInMinute * 60;
 const msInDay = msInHour * 24;
 
 const dis = discontinuitySkipMarketClose(calendar);
+
+describe('formatDate', () => {
+    test('Format the date correctly', () => {
+        expect(formatDate(new Date('2020-01-07T01:00:00-05:00'))).toBe('2020-01-07');
+    });
+});
 
 describe('clampDown', () => {
     test('Unchanged - market open', () => {
@@ -136,6 +142,12 @@ describe('distance', () => {
         ).toEqual(msInHour);
     });
 
+    test('Same day - end at market close', () => {
+        expect(
+            dis.distance(new Date('2020-01-07T15:00:00-05:00'), new Date('2020-01-07T16:00:00-05:00'))
+        ).toEqual(msInHour);
+    });
+
     test('Same day - start before market open and end after market closes', () => {
         expect(
             dis.distance(new Date('2020-01-07T02:00:00-05:00'), new Date('2020-01-07T17:00:00-05:00'))
@@ -158,6 +170,18 @@ describe('distance', () => {
         expect(
             dis.distance(new Date('2020-01-07T02:00:00-05:00'), new Date('2020-01-08T15:00:00-05:00'))
         ).toEqual(6 * 60 * msInMinute * 2);
+    });
+
+    test('Following day - start at market open and end at market close', () => {
+        expect(
+            dis.distance(new Date('2020-01-07T09:30:00-05:00'), new Date('2020-01-08T16:00:00-05:00'))
+        ).toEqual(2 * (6 * 60 + 30) * msInMinute);
+    });
+
+    test('Following day - start at market open and end at market open following day', () => {
+        expect(
+            dis.distance(new Date('2020-01-07T09:30:00-05:00'), new Date('2020-01-08T09:30:00-05:00'))
+        ).toEqual((6 * 60 + 30) * msInMinute);
     });
 });
 
